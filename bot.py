@@ -98,7 +98,7 @@ async def handle_message(message: types.Message):
     await message.chat.do("typing")
 
     answer = await get_arbitr_response(question)
-    await message.reply(answer)
+    await message.reply(answer, parse_mode="Markdown")
 
 async def main():
     print("Бот запущен...")

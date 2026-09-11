@@ -38,7 +38,7 @@ SYSTEM_PROMPT = """Ты — независимый и непредвзятый �
 async def get_arbitr_response(user_question: str) -> str:
     try:
         completion = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # хорошая модель на Groq
+            model="openai/gpt-oss-20b",  # хорошая модель на Groq
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_question}

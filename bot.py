@@ -18,13 +18,23 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-async def get_arbitr_response(user_question: str) -> str:
+
+async def get_arbitr_response(user_question: str, context: str = "") -> str:
     try:
+        # Формируем сообщение для модели
+        if context:
+            full_prompt = (
+                f"Контекст (предыдущее сообщение):\n{context}\n\n"
+                f"Вопрос пользователя:\n{user_question}"
+            )
+        else:
+            full_prompt = user_question
+
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_question}
+                {"role": "user", "content": full_prompt}
             ],
             temperature=0.3,
             max_tokens=1024
@@ -34,8 +44,8 @@ async def get_arbitr_response(user_question: str) -> str:
         logging.error(f"Ошибка Groq: {e}")
         return "Произошла ошибка при обращении к модели. Попробуй позже."
 
+
 def should_respond(message: types.Message, bot_username: str) -> bool:
-    """Проверяет, нужно ли боту отвечать на сообщение"""
     if not message.text:
         return False
 
@@ -60,6 +70,7 @@ def should_respond(message: types.Message, bot_username: str) -> bool:
 
     return False
 
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
@@ -67,8 +78,10 @@ async def cmd_start(message: types.Message):
         "Вызови меня так:\n"
         "• @ArbitrTGBot вопрос\n"
         "• Арбитр вопрос\n\n"
-        "Могу разобрать спор или просто объяснить тему."
+        "Можешь также ответить на любое сообщение и написать «Арбитр» — "
+        "я учту предыдущее сообщение как контекст."
     )
+
 
 @dp.message()
 async def handle_message(message: types.Message):
@@ -78,15 +91,16 @@ async def handle_message(message: types.Message):
     if not should_respond(message, bot_username):
         return
 
+    # Получаем текст вопроса
     question = message.text or ""
-    
-    # Убираем упоминания из текста
+
+    # Убираем упоминания бота
     question = question.replace(f"@{bot_username}", "")
     question = question.replace(f"@{bot_username.lower()}", "")
-    
+
     if question.lower().startswith("арбитр"):
         question = question[6:].strip()
-    if question.lower().startswith("!арбитр"):
+    elif question.lower().startswith("!арбитр"):
         question = question[7:].strip()
 
     question = question.strip()
@@ -95,14 +109,21 @@ async def handle_message(message: types.Message):
         await message.reply("Напиши, пожалуйста, вопрос.")
         return
 
+    # --- Сбор контекста ---
+    context = ""
+    if message.reply_to_message and message.reply_to_message.text:
+        context = message.reply_to_message.text.strip()
+
     await message.chat.do("typing")
 
-    answer = await get_arbitr_response(question)
+    answer = await get_arbitr_response(question, context)
     await message.reply(answer, parse_mode="Markdown")
+
 
 async def main():
     print("Бот запущен...")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

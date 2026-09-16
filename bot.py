@@ -21,7 +21,6 @@ groq_client = Groq(api_key=GROQ_API_KEY)
 
 async def get_arbitr_response(user_question: str, context: str = "") -> str:
     try:
-        # Формируем сообщение для модели
         if context:
             full_prompt = (
                 f"Контекст (предыдущее сообщение):\n{context}\n\n"
@@ -51,20 +50,16 @@ def should_respond(message: types.Message, bot_username: str) -> bool:
 
     text = message.text.lower().strip()
 
-    # Вызов через @username
     if f"@{bot_username.lower()}" in text:
         return True
 
-    # Вызов через слово "арбитр"
     if text.startswith("арбитр") or text.startswith("!арбитр"):
         return True
 
-    # Ответ на сообщение бота
     if message.reply_to_message and message.reply_to_message.from_user:
         if message.reply_to_message.from_user.id == bot.id:
             return True
 
-    # В личных сообщениях отвечаем всегда
     if message.chat.type == "private":
         return True
 
@@ -75,12 +70,40 @@ def should_respond(message: types.Message, bot_username: str) -> bool:
 async def cmd_start(message: types.Message):
     await message.answer(
         "Привет! Я независимый арбитр.\n\n"
-        "Вызови меня так:\n"
-        "• @ArbitrTGBot вопрос\n"
-        "• Арбитр вопрос\n\n"
-        "Можешь также ответить на любое сообщение и написать «Арбитр» — "
-        "я учту предыдущее сообщение как контекст."
+        "Вызови меня командой /help, чтобы узнать, как пользоваться."
     )
+
+
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    text = (
+        "Как пользоваться ботом:\n\n"
+        "• Напиши «Арбитр» и свой вопрос\n"
+        "• Или упомяни @ArbitrTGBot\n"
+        "• Можно ответить на любое сообщение и написать «Арбитр» — я учту его как контекст\n\n"
+        "Примеры:\n"
+        "Арбитр кто правее в этом споре?\n"
+        "Арбитр объясни, в чём разница между этими позициями\n\n"
+        "Я могу:\n"
+        "— разбирать споры\n"
+        "— оценивать силу аргументов\n"
+        "— давать пояснения по теме"
+    )
+    await message.answer(text)
+
+
+@dp.message(Command("about"))
+async def cmd_about(message: types.Message):
+    text = (
+        "Я — независимый арбитр для споров в Telegram.\n\n"
+        "• Работаю без прав администратора\n"
+        "• Вижу только те сообщения, в которых меня вызвали\n"
+        "• Не принадлежу владельцу канала и не подстраиваюсь под него\n"
+        "• Стараюсь отделять факты от мнений и не занимать сторону автоматически\n\n"
+        "Если спор ценностный — прямо говорю об этом.\n"
+        "Если одна позиция сильнее по фактам — тоже говорю прямо."
+    )
+    await message.answer(text)
 
 
 @dp.message()
@@ -91,7 +114,6 @@ async def handle_message(message: types.Message):
     if not should_respond(message, bot_username):
         return
 
-    # Получаем текст вопроса
     question = message.text or ""
 
     # Убираем упоминания бота
@@ -109,7 +131,7 @@ async def handle_message(message: types.Message):
         await message.reply("Напиши, пожалуйста, вопрос.")
         return
 
-    # --- Сбор контекста ---
+    # Сбор контекста
     context = ""
     if message.reply_to_message and message.reply_to_message.text:
         context = message.reply_to_message.text.strip()

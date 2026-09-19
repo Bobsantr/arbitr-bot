@@ -5,7 +5,10 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from groq import Groq
 from dotenv import load_dotenv
+
 from prompt import SYSTEM_PROMPT
+from texts import START_TEXT, HELP_TEXT, ABOUT_TEXT
+from config import TRIGGER_WORDS
 
 load_dotenv()
 
@@ -50,60 +53,57 @@ def should_respond(message: types.Message, bot_username: str) -> bool:
 
     text = message.text.lower().strip()
 
+    # Вызов через @username
     if f"@{bot_username.lower()}" in text:
         return True
 
-    if text.startswith("арбитр") or text.startswith("!арбитр"):
-        return True
+    # Вызов через слова из списка TRIGGER_WORDS
+    for word in TRIGGER_WORDS:
+        if text.startswith(word):
+            return True
 
+    # Ответ на сообщение бота
     if message.reply_to_message and message.reply_to_message.from_user:
         if message.reply_to_message.from_user.id == bot.id:
             return True
 
+    # В личных сообщениях отвечаем всегда
     if message.chat.type == "private":
         return True
 
     return False
 
 
+def clean_question(text: str, bot_username: str) -> str:
+    """Убирает упоминания бота и триггерные слова из начала сообщения"""
+    if not text:
+        return ""
+
+    result = text.replace(f"@{bot_username}", "").replace(f"@{bot_username.lower()}", "")
+    result = result.strip()
+
+    lower_result = result.lower()
+    for word in TRIGGER_WORDS:
+        if lower_result.startswith(word):
+            result = result[len(word):].strip()
+            break
+
+    return result
+
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer(
-        "Привет! Я независимый арбитр.\n\n"
-        "Вызови меня командой /help, чтобы узнать, как пользоваться."
-    )
+    await message.answer(START_TEXT)
 
 
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
-    text = (
-        "Как пользоваться ботом:\n\n"
-        "• Напиши «Арбитр» и свой вопрос\n"
-        "• Или упомяни @ArbitrTGBot\n"
-        "• Можно ответить на любое сообщение и написать «Арбитр» — я учту его как контекст\n\n"
-        "Примеры:\n"
-        "Арбитр кто правее в этом споре?\n"
-        "Арбитр объясни, в чём разница между этими позициями\n\n"
-        "Я могу:\n"
-        "— разбирать споры\n"
-        "— оценивать силу аргументов\n"
-        "— давать пояснения по теме"
-    )
-    await message.answer(text)
+    await message.answer(HELP_TEXT)
 
 
 @dp.message(Command("about"))
 async def cmd_about(message: types.Message):
-    text = (
-        "Я — независимый арбитр для споров в Telegram.\n\n"
-        "• Работаю без прав администратора\n"
-        "• Вижу только те сообщения, в которых меня вызвали\n"
-        "• Не принадлежу владельцу канала и не подстраиваюсь под него\n"
-        "• Стараюсь отделять факты от мнений и не занимать сторону автоматически\n\n"
-        "Если спор ценностный — прямо говорю об этом.\n"
-        "Если одна позиция сильнее по фактам — тоже говорю прямо."
-    )
-    await message.answer(text)
+    await message.answer(ABOUT_TEXT)
 
 
 @dp.message()
@@ -114,18 +114,7 @@ async def handle_message(message: types.Message):
     if not should_respond(message, bot_username):
         return
 
-    question = message.text or ""
-
-    # Убираем упоминания бота
-    question = question.replace(f"@{bot_username}", "")
-    question = question.replace(f"@{bot_username.lower()}", "")
-
-    if question.lower().startswith("арбитр"):
-        question = question[6:].strip()
-    elif question.lower().startswith("!арбитр"):
-        question = question[7:].strip()
-
-    question = question.strip()
+    question = clean_question(message.text or "", bot_username)
 
     if not question:
         await message.reply("Напиши, пожалуйста, вопрос.")
